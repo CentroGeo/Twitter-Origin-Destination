@@ -15,4 +15,9 @@ dependencies:
   - matplotlib
   - folium
   - pysal
+  - hvplot
+  - bokeh
+  - cartopy
+  - geoviews
+  - geopy
   - nodejs
