@@ -40,3 +40,20 @@ def get_trayectories(path_input_points, path_input_polygons, threshold):
     trayectorias['separation'] = trayectorias['geometry'].apply(get_start_end_distance)
     trayectorias = trayectorias[trayectorias['separation'] >= threshold]
     return(trayectorias)
+
+def preprocesa_archivo(file_path):
+  un_mes = pd.read_csv(file_path)
+  distritos = gpd.read_file("../data/shapes/DistritosEODHogaresZMVM2017.shp")
+  un_mes = un_mes.loc[:,['ID', 'Usuario', 'Fecha_tweet', 'Latitud', 'Longitud']]
+  un_mes = (gpd.GeoDataFrame(un_mes, geometry=gpd.points_from_xy                                          (un_mes.Longitud, un_mes.Latitud))
+          .drop(['Latitud', 'Longitud'], axis=1)
+          .set_crs(4326)
+          )
+  un_mes = (gpd.sjoin(un_mes, distritos.to_crs(4326))
+      .drop(['index_right', 'Descripcio'], axis=1)
+      )
+  un_mes['fecha_hora_dt'] = pd.to_datetime(
+      un_mes['Fecha_tweet'],
+      format='%Y-%m-%d %H:%M:%S',
+      utc=False)
+  return un_mes
