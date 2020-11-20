@@ -21,3 +21,5 @@ dependencies:
   - geoviews
   - geopy
   - nodejs
+  - pip:
+    - contextily
