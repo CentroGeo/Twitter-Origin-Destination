@@ -15,28 +15,45 @@ def get_start_end_distance(line):
   end = Point(line.coords[-1])
   return start.distance(end)
 
-def get_trayectories(path_input_points, path_input_polygons, threshold):
-    tuits = gpd.read_file(path_input_points)
-    tuits.drop(['id', 'fecha', 'hora', 'contenido', 'intervalo'], axis=1, inplace=True)
-    input_polygons = gpd.read_file(path_input_polygons)
+def get_trayectories(input_points, threshold=300):
+    """
+    Regresa las trayectorias agregadas por usuario, para cada día en 
+    intervalos de 4 horas.
+    
+    **NOTA:** asume que los puntos de entrada están en 4326 y 
+    regresa las trayectorias en 32614. Esto tiene que cambiar y tomar,
+    por lo menos, el srid de la salida.
+
+    También asume que los datos tienen una columna fecha_hora_dt que
+    se puede parsear a datetime como format='%Y-%m-%d %H:%M:%S' y que está en 
+    la zona horaria de CDMX. Tienen que tener una columna Usuario para 
+    agrupar las trayectorias
+
+    Parámetros:
+    input_points (GeoDataFrame(Point)): los puntos iniciales
+    threshold (float): separación mínima entre inicio y fin para ser 
+    considerada una trayectoria
+
+    Returns:
+    GeoDataFrame idexado por día e intervalo con las trayectorias obtenidas
+    """
+    tuits = gpd.read_file(input_points)
     tuits = tuits.to_crs("EPSG:32614")
-    tuits = gpd.sjoin(tuits, input_polygons)
     tuits['fecha_hora_dt'] = pd.to_datetime(
-        tuits['fecha_hora'],
+        tuits['fecha_hora_dt'],
         format='%Y-%m-%d %H:%M:%S',
         utc=True)
-    tuits.fecha_hora_dt = tuits.fecha_hora_dt.dt.tz_convert(
-        'America/Mexico_City')
     tuits.sort_index(inplace=True)
     trayectorias = (tuits.groupby([pd.Grouper(key='fecha_hora_dt', freq='1D'), 
                     pd.Grouper(key='fecha_hora_dt', freq='4H', base=2), 
-                    'uname']))[['geometry']].agg(regresa_puntos)
-    trayectorias.index.names =['dia', 'intervalo', 'uname']
+                    'Usuario']))[['geometry']].agg(regresa_puntos)
+    trayectorias.index.names =['dia', 'intervalo', 'Usuario']
     trayectorias = trayectorias[trayectorias['geometry'].notnull()]
     trayectorias['linea'] = trayectorias['geometry'].apply(lambda x: LineString(x))
     trayectorias.drop(['geometry'], axis=1, inplace=True)
     trayectorias.rename({'linea': 'geometry'}, axis=1, inplace=True)
     trayectorias = gpd.GeoDataFrame(trayectorias)
+    trayectorias = trayectorias.set_crs(epsg=32614)
     trayectorias['separation'] = trayectorias['geometry'].apply(get_start_end_distance)
     trayectorias = trayectorias[trayectorias['separation'] >= threshold]
     return(trayectorias)
